@@ -1,0 +1,20 @@
+FROM cgr.dev/chainguard/wolfi-base
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apk add --no-cache python-3.12 py3.12-pip
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+RUN apk del --no-cache py3.12-pip
+
+RUN adduser -D -u 10001 appuser
+USER appuser
+
+COPY . .
+
+CMD ["python", "consumer.py"]

@@ -1,0 +1,116 @@
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.8.0
+    container_name: vitals-kafka
+    environment:
+      # Identité KRaft
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qg"
+      # Listeners
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      # Réplication
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # Démarrage et gardefous
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      # Données
+      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - vitals-net
+    ports:
+      - "29092:29092"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  postgres:
+    image: cgr.dev/chainguard/postgres:latest
+    container_name: vitals-postgres
+    ports:
+      - "55432:5432"
+    environment:
+      POSTGRES_DB: healthstream
+      POSTGRES_USER: hs_user
+      POSTGRES_PASSWORD: hs_password
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./sql/init.sql:/var/lib/postgres/initdb/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hs_user -d healthstream"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - vitals-net
+
+  producer:
+    build:
+      context: ./producer
+    container_name: vitals-producer
+    command: tail -f /dev/null
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP: "kafka:9092"
+      VITALS_TOPIC: "mimic-vitals"
+      NB_PATIENTS: "12"
+      INTERVAL_S: "${INTERVAL_S:-1.0}"
+    volumes:
+      - vitals-logs:/app/logs
+    networks:
+      - vitals-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  consumer:
+    build:
+      context: ./consumer
+    # container_name est volontairement absent pour permettre la mise à l'échelle (--scale consumer=2)
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      KAFKA_BOOTSTRAP: "kafka:9092"
+      VITALS_TOPIC: "mimic-vitals"
+      CONSUMER_GROUP: "vitals-persister"
+      AUTO_OFFSET_RESET: "earliest"
+      BATCH_SIZE: "${BATCH_SIZE:-200}"
+      BATCH_TIMEOUT_S: "5.0"
+      PG_HOST: "postgres"
+      PG_PORT: "5432"
+      PG_DB: "healthstream"
+      PG_USER: "hs_user"
+      PG_PASSWORD: "hs_password"
+    networks:
+      - vitals-net
+
+volumes:
+  vitals-logs:
+  kafka-data:
+  pg-data:
+
+networks:
+  vitals-net:
+    driver: bridge

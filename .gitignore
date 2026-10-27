@@ -1,0 +1,84 @@
+# ============================================================
+# .gitignore — permet un "git add ." sans risque
+# Principe : on ne versionne que le code, la doc et les preuves
+# (captures). Tout ce qui est secret, lourd ou regenerable est ignore.
+# ============================================================
+
+# --- Secrets / identifiants (JAMAIS sur GitHub) --------------
+.venv
+.venv.*
+*.venv
+kaggle.json
+.kaggle/
+.azure/
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+id_rsa*
+*secret*
+*credentials*
+*.publishsettings
+
+# --- Donnees (ISIC 2024 : 246 Mo, > limite GitHub de 100 Mo) -
+data/
+*.csv
+*.hdf5
+*.h5
+*.parquet
+*.zip
+*.7z
+*.tar
+*.tar.gz
+
+# --- Modeles entraines (regenerables via entrainer.py) -------
+*.joblib
+*.pkl
+*.pickle
+*.onnx
+*.pt
+*.pth
+*.safetensors
+model/*
+!model/.gitkeep
+
+# --- Supports de cours (enonce du TP) ------------------------
+*.pdf
+
+# --- venvironnements Python -----------------------------------
+.vvenv/
+vvenv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+.mypy_cache/
+.ruff_cache/
+
+# --- Livrables regenerables : journaux et scripts d'execution -
+# (le rendu les exclut ; retirer ces 2 lignes pour les versionner)
+sorties/
+scripts/
+
+# --- Infra-as-code : etats et variables (peuvent contenir des secrets)
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+
+# --- Journaux / transcripts PowerShell -----------------------
+*.log
+PowerShell_transcript*
+
+# --- Fichiers systeme et editeurs ----------------------------
+Thumbs.db
+desktop.ini
+*:Zone.Identifier
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
